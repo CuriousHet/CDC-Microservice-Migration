@@ -61,3 +61,24 @@ services:
       STATUS_STORAGE_REPLICATION_FACTOR: 1
       KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+
+  # Visual Tools for Verification
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8081:8080"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+  debezium-ui:
+    image: debezium/debezium-ui:2.4
+    ports:
+      - "8084:8080"
+    depends_on:
+      - debezium
+    environment:
+      KAFKA_CONNECT_URIS: http://debezium:8083

@@ -82,3 +82,19 @@ services:
       - debezium
     environment:
       KAFKA_CONNECT_URIS: http://debezium:8083
+
+  # Target Microservice Database
+  user-db:
+    image: postgres:15-alpine
+    container_name: user-db
+    ports:
+      - "5433:5432" # Use a different host port to avoid conflict
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_service
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

@@ -62,5 +62,5 @@ docker exec -i user-db psql -U postgres -d user_service -c "SELECT count(*) FROM
 ```
 Check individual records:
 ```bash
-curl http://localhost:8082/users/:id
+curl http://localhost:8081/users/:id
 ```

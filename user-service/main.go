@@ -87,8 +87,8 @@ func main() {
 		c.JSON(http.StatusOK, user)
 	})
 
-	log.Println("User Service API starting on :8082")
-	r.Run(":8082")
+	log.Println("User Service API starting on :8081")
+	r.Run(":8081")
 }
 
 func startMigrationWorker() {

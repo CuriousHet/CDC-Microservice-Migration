@@ -39,6 +39,8 @@ func main() {
 
 	r.POST("/users", createUser)
 	r.POST("/orders", createOrder)
+	r.GET("/users/:id", getUser)
+	r.GET("/orders/:id", getOrder)
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 	})
@@ -101,4 +103,34 @@ func createOrder(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, order)
+}
+
+func getUser(c *gin.Context) {
+	id := c.Param("id")
+	var user User
+	err := db.QueryRow("SELECT id, name, email FROM users WHERE id = $1", id).Scan(&user.ID, &user.Name, &user.Email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}
+
+func getOrder(c *gin.Context) {
+	id := c.Param("id")
+	var order Order
+	err := db.QueryRow("SELECT id, user_id, amount FROM orders WHERE id = $1", id).Scan(&order.ID, &order.UserID, &order.Amount)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, order)
 }

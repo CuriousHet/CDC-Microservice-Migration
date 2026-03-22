@@ -89,6 +89,10 @@ func main() {
 		c.JSON(http.StatusOK, order)
 	})
 
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "order-service"})
+	})
+
 	log.Println("Order Service API starting on :8082")
 	r.Run(":8082")
 }

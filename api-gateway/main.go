@@ -52,6 +52,10 @@ func main() {
 		monolithProxy.ServeHTTP(c.Writer, c.Request)
 	})
 
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "api-gateway"})
+	})
+
 	log.Println("API Gateway (Strangler) starting on :8000")
 	if err := r.Run(":8000"); err != nil {
 		log.Fatalf("Could not start API Gateway: %v", err)

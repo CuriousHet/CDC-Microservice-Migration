@@ -87,6 +87,10 @@ func main() {
 		c.JSON(http.StatusOK, user)
 	})
 
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "user-service"})
+	})
+
 	log.Println("User Service API starting on :8081")
 	r.Run(":8081")
 }

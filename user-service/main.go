@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/segmentio/kafka-go"
 )
@@ -31,7 +32,7 @@ type CDCEvent struct {
 		Name      string `json:"name"`
 		CreatedAt int64  `json:"created_at"`
 	} `json:"before"`
-	After  *struct {
+	After *struct {
 		ID        int    `json:"id"`
 		Email     string `json:"email"`
 		Name      string `json:"name"`
@@ -42,12 +43,15 @@ type CDCEvent struct {
 var db *sql.DB
 
 func main() {
+	// 0. Load .env file (try common paths)
+	godotenv.Load("../.env")
+
 	// 1. Connect to User DB
 	var err error
-	dbConn := os.Getenv("DATABASE_URL")
+	dbConn := os.Getenv("USER_DB_URL")
 	if dbConn == "" {
-		dbConn = "postgres://postgres:password@localhost:5433/user_service?sslmode=disable"
-	}
+		log.Fatal("USER_DB_URL is not set")	
+	}	
 
 	for i := 0; i < 5; i++ {
 		db, err = sql.Open("postgres", dbConn)
@@ -76,7 +80,7 @@ func main() {
 		var user User
 		err := db.QueryRow("SELECT id, email, name, created_at FROM users WHERE id = $1", id).
 			Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt)
-		
+
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return
@@ -99,9 +103,8 @@ func startMigrationWorker() {
 	topic := "monolith.public.users"
 	broker := os.Getenv("KAFKA_BROKER")
 	if broker == "" {
-		broker = "localhost:9092"
-	}
-
+    log.Fatal("KAFKA_BROKER is not set")
+}
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  []string{broker},
 		Topic:    topic,
@@ -125,7 +128,7 @@ func startMigrationWorker() {
 			continue
 		}
 
-// Handle CREATE or UPDATE
+		// Handle CREATE or UPDATE
 		if event.Op == "c" || event.Op == "u" || event.Op == "r" {
 			user := event.After
 			if user == nil {

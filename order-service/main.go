@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/segmentio/kafka-go"
 )
@@ -42,11 +43,14 @@ type CDCEvent struct {
 var db *sql.DB
 
 func main() {
+	// 0. Load .env file (try common paths)
+	godotenv.Load("../.env")
+
 	// 1. Connect to Order DB (port 5434)
 	var err error
-	dbConn := os.Getenv("DATABASE_URL")
+	dbConn := os.Getenv("ORDER_DB_URL")
 	if dbConn == "" {
-		dbConn = "postgres://postgres:password@localhost:5434/order_service?sslmode=disable"
+		log.Fatal("ORDER_DB_URL is not set")
 	}
 
 	for i := 0; i < 5; i++ {
@@ -101,7 +105,7 @@ func startMigrationWorker() {
 	topic := "monolith.public.orders" // Monolith orders table
 	broker := os.Getenv("KAFKA_BROKER")
 	if broker == "" {
-		broker = "localhost:9092"
+		log.Fatal("KAFKA BROKER is not set.")
 	}
 
 	reader := kafka.NewReader(kafka.ReaderConfig{
@@ -169,4 +173,4 @@ func initDB() {
 		log.Fatalf("Could not initialize order-db: %v", err)
 	}
 	log.Println("Order DB schema initialized")
-}
+}

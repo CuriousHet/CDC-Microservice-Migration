@@ -29,6 +29,8 @@ The project simulates a transformation from a single Go monolith with a shared d
 3. [**Phase 3: Decomposition**](docs/phase-3.md) - Implementing the User service and data sync.
 4. [**Phase 4: Scaling Out**](docs/phase-4.md) - Implementing the Order service.
 5. [**Phase 5: Traffic Cutover**](docs/phase-5.md) - Implementing the API Gateway and Strangler Pattern.
+6. [**Phase 6: Historical Data Backfill**](docs/phase-6.md) - Bulk migration utility.
+7. [**Phase 7: Migration Observability**](docs/phase-7.md) - Real-time Mission Control Dashboard.
 
 ## 🛠️ Tech Stack
 

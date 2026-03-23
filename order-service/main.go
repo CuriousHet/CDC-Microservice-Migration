@@ -97,6 +97,38 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "order-service"})
 	})
 
+	// Parity Checker: Compare local data with "expected" data from monolith
+	r.POST("/verify/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var expectedOrder Order
+		if err := c.ShouldBindJSON(&expectedOrder); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+			return
+		}
+
+		var localOrder Order
+		err := db.QueryRow("SELECT id, user_id, amount, created_at FROM orders WHERE id = $1", id).
+			Scan(&localOrder.ID, &localOrder.UserID, &localOrder.Amount, &localOrder.CreatedAt)
+
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"match": false, "error": "Order not found locally"})
+			return
+		} else if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"match": false, "error": err.Error()})
+			return
+		}
+
+		// Simple comparison
+		match := localOrder.UserID == expectedOrder.UserID &&
+			localOrder.Amount == expectedOrder.Amount
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":    id,
+			"match": match,
+			"local": localOrder,
+		})
+	})
+
 	log.Println("Order Service API starting on :8082")
 	r.Run(":8082")
 }

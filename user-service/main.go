@@ -95,6 +95,37 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "user-service"})
 	})
 
+	// Parity Checker: Compare local data with "expected" data from monolith
+	r.POST("/verify/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		var expectedUser User
+		if err := c.ShouldBindJSON(&expectedUser); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+			return
+		}
+
+		var localUser User
+		err := db.QueryRow("SELECT id, email, name, created_at FROM users WHERE id = $1", id).
+			Scan(&localUser.ID, &localUser.Email, &localUser.Name, &localUser.CreatedAt)
+
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"match": false, "error": "User not found locally"})
+			return
+		} else if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"match": false, "error": err.Error()})
+			return
+		}
+
+		// Simple comparison (ignoring timestamps if they differ slightly)
+		match := localUser.Name == expectedUser.Name && localUser.Email == expectedUser.Email
+		
+		c.JSON(http.StatusOK, gin.H{
+			"id":    id,
+			"match": match,
+			"local": localUser,
+		})
+	})
+
 	log.Println("User Service API starting on :8081")
 	r.Run(":8081")
 }

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migration Mission Control</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030712;
+            --surface: rgba(30, 41, 59, 0.7);
+            --border: rgba(255, 255, 255, 0.1);
+            --accent: #38bdf8;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(74, 222, 128, 0.1) 0, transparent 50%);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        header {
+            margin-bottom: 40px;
+            text-align: left;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            margin-bottom: 8px;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .total-badge {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent);
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .metric-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .metric-value.success { color: var(--success); }
+        .metric-value.warning { color: var(--warning); }
+
+        .progress-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 99px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .progress-inner {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 99px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .progress-inner.success { background: var(--success); }
+        .progress-inner.warning { background: var(--warning); }
+
+        .total-card {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 40px;
+        }
+
+        .total-label {
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .total-value {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        footer {
+            margin-top: auto;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-align: center;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+    </style>
+    <script>
+        // Auto-refresh the page every 3 seconds to get live metrics
+        setTimeout(() => location.reload(), 3000);
+
+        // Apply dynamic widths to progress bars
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".progress-inner").forEach(bar => {
+                const width = bar.getAttribute("data-width");
+                if (width) {
+                    bar.style.width = width + "%";
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <p class="subtitle"><span class="live-indicator"></span>LIVE SYSTEM METRICS</p>
+            <h1>Migration Mission Control</h1>
+        </header>
+
+        <div class="stats-grid">
+            <div class="card total-card">
+                <span class="total-label">Incoming Gateway Requests</span>
+                <span class="total-value">{{.TotalRequests}}</span>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">User Service</span>
+                    <span class="total-badge">{{.UserTotal}}</span>
+                </div>
+                <div class="metric-group">
+                    <div class="metric">
+                        <span class="metric-label">Microservice Hits</span>
+                        <span class="metric-value success">{{.UserNewHits}}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-inner success" data-width="{{.UserSuccessRate}}"></div>
+                    </div>
+                    <div class="metric" style="margin-top: 24px;">
+                        <span class="metric-label">Monolith Fallback</span>
+                        <span class="metric-value warning">{{.UserFallbackHits}}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Order Service</span>
+                    <span class="total-badge">{{.OrderTotal}}</span>
+                </div>
+                <div class="metric-group">
+                    <div class="metric">
+                        <span class="metric-label">Microservice Hits</span>
+                        <span class="metric-value success">{{.OrderNewHits}}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-inner success" data-width="{{.OrderSuccessRate}}"></div>
+                    </div>
+                    <div class="metric" style="margin-top: 24px;">
+                        <span class="metric-label">Monolith Fallback</span>
+                        <span class="metric-value warning">{{.OrderFallbackHits}}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity Section -->
+        <div class="card" style="margin-top: 32px;">
+            <div class="card-header">
+                <span class="card-title">Recent Activity</span>
+                <span class="total-badge" style="background: rgba(255, 255, 255, 0.1);">Audit Log</span>
+            </div>
+            <div style="overflow-x: auto; margin-top: 20px;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                            <th style="padding: 12px; color: var(--text-secondary); font-size: 0.875rem;">Time</th>
+                            <th style="padding: 12px; color: var(--text-secondary); font-size: 0.875rem;">Service</th>
+                            <th style="padding: 12px; color: var(--text-secondary); font-size: 0.875rem;">ID</th>
+                            <th style="padding: 12px; color: var(--text-secondary); font-size: 0.875rem;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .RecentLogs}}
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <td style="padding: 12px; color: var(--text-secondary); font-family: monospace;">{{.Timestamp}}</td>
+                            <td style="padding: 12px; font-weight: 500;">{{.ServiceID}}</td>
+                            <td style="padding: 12px; color: #fff;">#{{.ID}}</td>
+                            <td style="padding: 12px;">
+                                {{if eq .Result "Monolith"}}
+                                <span style="color: var(--warning); background: rgba(251, 191, 36, 0.1); padding: 4px 12px; border-radius: 99px; font-size: 0.75rem; border: 1px solid rgba(251, 191, 36, 0.2);">Monolith</span>
+                                {{else}}
+                                <span style="color: var(--success); background: rgba(74, 222, 128, 0.1); padding: 4px 12px; border-radius: 99px; font-size: 0.75rem; border: 1px solid rgba(74, 222, 128, 0.2);">Microservice</span>
+                                {{end}}
+                            </td>
+                        </tr>
+                        {{else}}
+                        <tr>
+                            <td colspan="4" style="padding: 32px; text-align: center; color: var(--text-secondary);">Waiting for traffic...</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer>
+            System is operating under progressive rollout (Strangler Fig Pattern). 
+            Data is consistent via CDC Pipeline.
+        </footer>
+    </div>
+</body>
+</html>

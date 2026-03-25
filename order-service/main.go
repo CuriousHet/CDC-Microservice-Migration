@@ -69,8 +69,6 @@ func main() {
 	}
 	log.Println("Connected to Order DB")
 	
-	initDB()
-
 	// 2. Start Migration Worker
 	go startMigrationWorker()
 
@@ -167,6 +165,7 @@ func startMigrationWorker() {
 		if event.Op == "c" || event.Op == "u" || event.Op == "r" {
 			order := event.After
 			if order == nil {
+				log.Printf("Error: order is nil")
 				continue
 			}
 
@@ -189,20 +188,4 @@ func startMigrationWorker() {
 			}
 		}
 	}
-}
-
-func initDB() {
-	query := `
-		CREATE TABLE IF NOT EXISTS orders (
-			id SERIAL PRIMARY KEY,
-			user_id INTEGER,
-			amount DECIMAL(10,2) NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		);
-	`
-	_, err := db.Exec(query)
-	if err != nil {
-		log.Fatalf("Could not initialize order-db: %v", err)
-	}
-	log.Println("Order DB schema initialized")
 }

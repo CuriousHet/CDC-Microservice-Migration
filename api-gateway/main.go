@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 type LogEntry struct {
@@ -31,6 +33,10 @@ var (
 		OrderMonolithFallbackHits int        `json:"order_monolith_fallback_hits"`
 		TotalRequests             int        `json:"total_requests"`
 		RecentLogs                []LogEntry `json:"recent_logs"`
+		UserSyncCount             int        `json:"user_sync_count"`
+		UserMonolithCount         int        `json:"user_monolith_count"`
+		OrderSyncCount            int        `json:"order_sync_count"`
+		OrderMonolithCount        int        `json:"order_monolith_count"`
 	}{
 		RecentLogs: make([]LogEntry, 0),
 	}
@@ -65,6 +71,14 @@ func main() {
 	userServiceProxy := httputil.NewSingleHostReverseProxy(userServiceURL)
 	orderServiceProxy := httputil.NewSingleHostReverseProxy(orderServiceURL)
 
+	// 0.1 Initialize Database Connections for Monitoring
+	dbs, err := initDBs()
+	if err != nil {
+		log.Printf("[WARN] Monitoring DBs not available: %v", err)
+	} else {
+		go startDBPoller(dbs)
+	}
+
 	r := gin.Default()
 	r.LoadHTMLFiles("dashboard.html")
 
@@ -86,17 +100,33 @@ func main() {
 			orderSuccessRate = (metrics.OrderNewServiceHits * 100) / orderTotal
 		}
 
+		userSyncRate := 0
+		if metrics.UserMonolithCount > 0 {
+			userSyncRate = (metrics.UserSyncCount * 100) / metrics.UserMonolithCount
+		}
+
+		orderSyncRate := 0
+		if metrics.OrderMonolithCount > 0 {
+			orderSyncRate = (metrics.OrderSyncCount * 100) / metrics.OrderMonolithCount
+		}
+
 		c.HTML(http.StatusOK, "dashboard.html", gin.H{
-			"TotalRequests":     metrics.TotalRequests,
-			"UserTotal":         userTotal,
-			"UserNewHits":       metrics.UserNewServiceHits,
-			"UserFallbackHits":  metrics.UserMonolithFallbackHits,
-			"UserSuccessRate":   userSuccessRate,
-			"OrderTotal":        orderTotal,
-			"OrderNewHits":      metrics.OrderNewServiceHits,
-			"OrderFallbackHits": metrics.OrderMonolithFallbackHits,
-			"OrderSuccessRate":  orderSuccessRate,
-			"RecentLogs":        metrics.RecentLogs,
+			"TotalRequests":      metrics.TotalRequests,
+			"UserTotal":          userTotal,
+			"UserNewHits":        metrics.UserNewServiceHits,
+			"UserFallbackHits":   metrics.UserMonolithFallbackHits,
+			"UserSuccessRate":    userSuccessRate,
+			"UserSyncCount":      metrics.UserSyncCount,
+			"UserMonolithCount":  metrics.UserMonolithCount,
+			"UserSyncRate":       userSyncRate,
+			"OrderTotal":         orderTotal,
+			"OrderNewHits":       metrics.OrderNewServiceHits,
+			"OrderFallbackHits":  metrics.OrderMonolithFallbackHits,
+			"OrderSuccessRate":   orderSuccessRate,
+			"OrderSyncCount":     metrics.OrderSyncCount,
+			"OrderMonolithCount": metrics.OrderMonolithCount,
+			"OrderSyncRate":      orderSyncRate,
+			"RecentLogs":         metrics.RecentLogs,
 		})
 	})
 
@@ -219,4 +249,55 @@ func (w *statusSyncWriter) Write(b []byte) (int, error) {
 		return len(b), nil
 	}
 	return w.ResponseWriter.Write(b)
+}
+
+// Monitoring Helpers
+
+type monitoredDBs struct {
+	monolith *sql.DB
+	users    *sql.DB
+	orders   *sql.DB
+}
+
+func initDBs() (*monitoredDBs, error) {
+	mDB, err := sql.Open("postgres", os.Getenv("MONOLITH_DB_URL"))
+	if err != nil {
+		return nil, err
+	}
+	uDB, err := sql.Open("postgres", os.Getenv("USER_DB_URL"))
+	if err != nil {
+		return nil, err
+	}
+	oDB, err := sql.Open("postgres", os.Getenv("ORDER_DB_URL"))
+	if err != nil {
+		return nil, err
+	}
+
+	return &monitoredDBs{monolith: mDB, users: uDB, orders: oDB}, nil
+}
+
+func startDBPoller(dbs *monitoredDBs) {
+	ticker := time.NewTicker(5 * time.Second)
+	for range ticker.C {
+		var uMonolith, uSync, oMonolith, oSync int
+
+		// Query Monolith
+		dbs.monolith.QueryRow("SELECT COUNT(*) FROM users").Scan(&uMonolith)
+		dbs.monolith.QueryRow("SELECT COUNT(*) FROM orders").Scan(&oMonolith)
+
+		// Query User Service
+		dbs.users.QueryRow("SELECT COUNT(*) FROM users").Scan(&uSync)
+
+		// Query Order Service
+		dbs.orders.QueryRow("SELECT COUNT(*) FROM orders").Scan(&oSync)
+
+		metricsLock.Lock()
+		metrics.UserMonolithCount = uMonolith
+		metrics.UserSyncCount = uSync
+		metrics.OrderMonolithCount = oMonolith
+		metrics.OrderSyncCount = oSync
+		metricsLock.Unlock()
+
+		log.Printf("[MONITOR] Sync Status - Users: %d/%d, Orders: %d/%d", uSync, uMonolith, oSync, oMonolith)
+	}
 }

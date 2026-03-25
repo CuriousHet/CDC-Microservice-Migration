@@ -194,6 +194,46 @@
             box-shadow: 0 0 10px var(--success);
             animation: pulse 2s infinite;
         }
+
+        .sync-section {
+            margin-top: 32px;
+        }
+
+        .sync-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+        }
+
+        .sync-card {
+            padding: 24px;
+        }
+
+        .sync-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .sync-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .sync-percentage {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .sync-details {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            text-align: right;
+        }
     </style>
     <script>
         // Auto-refresh the page every 3 seconds to get live metrics
@@ -260,6 +300,41 @@
                         <span class="metric-label">Monolith Fallback</span>
                         <span class="metric-value warning">{{.OrderFallbackHits}}</span>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sync-section">
+            <header style="margin-bottom: 24px;">
+                <p class="subtitle">DATA SYNCHRONIZATION PROGRESS</p>
+            </header>
+            <div class="sync-grid">
+                <!-- User Sync Card -->
+                <div class="card sync-card">
+                    <div class="sync-info">
+                        <span class="sync-label">USER DATA MIGRATION</span>
+                        <span class="sync-percentage">{{.UserSyncRate}}%</span>
+                    </div>
+                    <div class="progress-bar" style="height: 12px;">
+                        <div class="progress-inner" data-width="{{.UserSyncRate}}" style="background: linear-gradient(90deg, #38bdf8, #818cf8);"></div>
+                    </div>
+                    <p class="sync-details">
+                        {{.UserSyncCount}} / {{.UserMonolithCount}} Records Synced
+                    </p>
+                </div>
+
+                <!-- Order Sync Card -->
+                <div class="card sync-card">
+                    <div class="sync-info">
+                        <span class="sync-label">ORDER DATA MIGRATION</span>
+                        <span class="sync-percentage">{{.OrderSyncRate}}%</span>
+                    </div>
+                    <div class="progress-bar" style="height: 12px;">
+                        <div class="progress-inner" data-width="{{.OrderSyncRate}}" style="background: linear-gradient(90deg, #4ade80, #34d399);"></div>
+                    </div>
+                    <p class="sync-details">
+                        {{.OrderSyncCount}} / {{.OrderMonolithCount}} Records Synced
+                    </p>
                 </div>
             </div>
         </div>

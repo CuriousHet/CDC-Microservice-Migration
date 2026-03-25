@@ -35,28 +35,47 @@ type Order struct {
 }
 
 func main() {
-	// 0. Load .env file (try common paths)
-	godotenv.Load("../.env")
+	log.Println("--- Starting Backfill Process ---")
+	
+	// 0. Load .env file
+	if err := godotenv.Load("../.env"); err != nil {
+		log.Println("Warning: .env file not found, using system environment variables")
+	}
 
 	// 1. Connect to Monolith DB
 	monolithDBUrl := os.Getenv("MONOLITH_DB_URL")
 	if monolithDBUrl == "" {
 		log.Fatal("MONOLITH_DB_URL is not set")
 	}
+	
+	log.Printf("Connecting to Monolith DB: %s", monolithDBUrl)
 	db, err := sql.Open("postgres", monolithDBUrl)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to open DB:", err)
 	}
 	defer db.Close()
 
-	// 2. Setup Kafka Writer
+	// Check connection
+	if err := db.Ping(); err != nil {
+		log.Fatal("Failed to reach Monolith DB:", err)
+	}
+	log.Println("Successfully connected to Monolith DB.")
+
+	// 2. Setup Kafka Broker address
 	kafkaBroker := os.Getenv("KAFKA_BROKER")
 	if kafkaBroker == "" {
 		log.Fatal("KAFKA_BROKER is not set")
 	}
+	log.Printf("Using Kafka Broker: %s", kafkaBroker)
 
+	// 3. Run Backfills
+	log.Println("Starting User backfill...")
 	backfillUsers(db, kafkaBroker)
+	
+	log.Println("Starting Order backfill...")
 	backfillOrders(db, kafkaBroker)
+	
+	log.Println("--- Backfill Completed ---")
 }
 
 func backfillUsers(db *sql.DB, broker string) {
@@ -64,9 +83,11 @@ func backfillUsers(db *sql.DB, broker string) {
 		Addr:     kafka.TCP(broker),
 		Topic:    "monolith.public.users",
 		Balancer: &kafka.LeastBytes{},
+		Async:    false, // Wait for acks so we see errors immediately
 	}
 	defer writer.Close()
 
+	log.Println("Querying users from Monolith...")
 	rows, err := db.Query("SELECT id, email, name, created_at FROM users")
 	if err != nil {
 		log.Printf("Error querying users: %v", err)
@@ -75,6 +96,8 @@ func backfillUsers(db *sql.DB, broker string) {
 	defer rows.Close()
 
 	count := 0
+	var messages []kafka.Message
+
 	for rows.Next() {
 		var u User
 		var createdAt time.Time
@@ -87,11 +110,30 @@ func backfillUsers(db *sql.DB, broker string) {
 		event := CDCEvent{Op: "r", After: &u}
 		payload, _ := json.Marshal(event)
 
-		writer.WriteMessages(context.Background(),
-			kafka.Message{Key: []byte(fmt.Sprintf("%d", u.ID)), Value: payload},
-		)
+		messages = append(messages, kafka.Message{
+			Key:   []byte(fmt.Sprintf("%d", u.ID)),
+			Value: payload,
+		})
+
 		count++
+		
+		// Flush every 100 messages
+		if len(messages) >= 100 {
+			err := writer.WriteMessages(context.Background(), messages...)
+			if err != nil {
+				log.Printf("Error writing batch to Kafka: %v", err)
+				return
+			}
+			messages = []kafka.Message{}
+			log.Printf("Sent %d users...", count)
+		}
 	}
+
+	// Flush remaining
+	if len(messages) > 0 {
+		writer.WriteMessages(context.Background(), messages...)
+	}
+
 	log.Printf("Successfully backfilled %d users.", count)
 }
 
@@ -100,9 +142,11 @@ func backfillOrders(db *sql.DB, broker string) {
 		Addr:     kafka.TCP(broker),
 		Topic:    "monolith.public.orders",
 		Balancer: &kafka.LeastBytes{},
+		Async:    false,
 	}
 	defer writer.Close()
 
+	log.Println("Querying orders from Monolith...")
 	rows, err := db.Query("SELECT id, user_id, amount, created_at FROM orders")
 	if err != nil {
 		log.Printf("Error querying orders: %v", err)
@@ -111,6 +155,8 @@ func backfillOrders(db *sql.DB, broker string) {
 	defer rows.Close()
 
 	count := 0
+	var messages []kafka.Message
+
 	for rows.Next() {
 		var o Order
 		var amount float64
@@ -125,10 +171,29 @@ func backfillOrders(db *sql.DB, broker string) {
 		event := CDCEvent{Op: "r", After: &o}
 		payload, _ := json.Marshal(event)
 
-		writer.WriteMessages(context.Background(),
-			kafka.Message{Key: []byte(fmt.Sprintf("%d", o.ID)), Value: payload},
-		)
+		messages = append(messages, kafka.Message{
+			Key:   []byte(fmt.Sprintf("%d", o.ID)),
+			Value: payload,
+		})
+
 		count++
+
+		// Flush every 100 messages
+		if len(messages) >= 100 {
+			err := writer.WriteMessages(context.Background(), messages...)
+			if err != nil {
+				log.Printf("Error writing batch to Kafka: %v", err)
+				return
+			}
+			messages = []kafka.Message{}
+			log.Printf("Sent %d orders...", count)
+		}
 	}
+
+	// Flush remaining
+	if len(messages) > 0 {
+		writer.WriteMessages(context.Background(), messages...)
+	}
+
 	log.Printf("Successfully backfilled %d orders.", count)
 }

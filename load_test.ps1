@@ -5,7 +5,7 @@ $totalRequests = 100
 Write-Host "Starting load test: $totalRequests random requests to $baseUrl..."
 
 for ($i = 1; $i -le $totalRequests; $i++) {
-    $id = Get-Random -Minimum 1 -Maximum 4001
+    $id = Get-Random -Minimum 1 -Maximum 6001
     $service = if ((Get-Random -Minimum 0 -Maximum 2) -eq 0) { "users" } else { "orders" }
     $url = "$baseUrl/$service/$id"
     

@@ -30,7 +30,7 @@ func main() {
 		user := User{Name: userName, Email: userEmail}
 		userData, _ := json.Marshal(user)
 		
-		resp, err := http.Post("http://localhost:8080/users", "application/json", bytes.NewBuffer(userData))
+		resp, err := http.Post("http://localhost:8000/users", "application/json", bytes.NewBuffer(userData))
 		if err == nil && resp.StatusCode == http.StatusCreated {
 			var createdUser struct{ ID int }
 			json.NewDecoder(resp.Body).Decode(&createdUser)
@@ -44,7 +44,7 @@ func main() {
 				Amount: float64(rand.Intn(500)) + rand.Float64(),
 			}
 			orderData, _ := json.Marshal(order)
-			http.Post("http://localhost:8080/orders", "application/json", bytes.NewBuffer(orderData))
+			http.Post("http://localhost:8000/orders", "application/json", bytes.NewBuffer(orderData))
 		}
 
 		time.Sleep(1 * time.Second) // Adjust frequency as needed

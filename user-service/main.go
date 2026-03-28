@@ -69,7 +69,10 @@ func main() {
 	}
 	log.Println("Connected to User DB")
 
-	// 2. Start Migration Worker in a goroutine
+	// 2. Sync ID Sequence (Crucial for Primary Cutover)
+	syncIDSequence()
+
+	// 3. Start Migration Worker in a goroutine
 	go startMigrationWorker()
 
 	// 3. Start API Server
@@ -93,6 +96,34 @@ func main() {
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy", "service": "user-service"})
+	})
+
+	// POST /users: Create a new user (Direct Write as Primary)
+	r.POST("/users", func(c *gin.Context) {
+		var input struct {
+			Email string `json:"email" binding:"required"`
+			Name  string `json:"name" binding:"required"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var user User
+		err := db.QueryRow(
+			"INSERT INTO users (email, name) VALUES ($1, $2) RETURNING id, email, name, created_at",
+			input.Email, input.Name,
+		).Scan(&user.ID, &user.Email, &user.Name, &user.CreatedAt)
+
+		if err != nil {
+			log.Printf("Error creating user: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create user"})
+			return
+		}
+
+		log.Printf("[WRITE] New User Created: %s (ID: %d)", user.Name, user.ID)
+		c.JSON(http.StatusCreated, user)
 	})
 
 	// Parity Checker: Compare local data with "expected" data from monolith
@@ -183,6 +214,24 @@ func startMigrationWorker() {
 			} else {
 				log.Printf("Synced user: %s (ID: %d)", user.Name, user.ID)
 			}
+		}
+	}
+}
+
+func syncIDSequence() {
+	var maxID sql.NullInt64
+	err := db.QueryRow("SELECT MAX(id) FROM users").Scan(&maxID)
+	if err != nil {
+		log.Printf("Error getting max user ID: %v", err)
+		return
+	}
+
+	if maxID.Valid {
+		_, err = db.Exec("SELECT setval('users_id_seq', $1)", maxID.Int64)
+		if err != nil {
+			log.Printf("Error setting user ID sequence: %v", err)
+		} else {
+			log.Printf("Synced users_id_seq to %d", maxID.Int64)
 		}
 	}
 }

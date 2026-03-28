@@ -69,7 +69,10 @@ func main() {
 	}
 	log.Println("Connected to Order DB")
 	
-	// 2. Start Migration Worker
+	// 2. Sync ID Sequence (Crucial for Primary Cutover)
+	syncIDSequence()
+
+	// 3. Start Migration Worker
 	go startMigrationWorker()
 
 	// 3. Start API Server (port 8082)
@@ -125,6 +128,34 @@ func main() {
 			"match": match,
 			"local": localOrder,
 		})
+	})
+
+	// POST /orders: Create a new order (Direct Write as Primary)
+	r.POST("/orders", func(c *gin.Context) {
+		var input struct {
+			UserID int     `json:"user_id" binding:"required"`
+			Amount float64 `json:"amount" binding:"required"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var order Order
+		err := db.QueryRow(
+			"INSERT INTO orders (user_id, amount) VALUES ($1, $2) RETURNING id, user_id, amount, created_at",
+			input.UserID, input.Amount,
+		).Scan(&order.ID, &order.UserID, &order.Amount, &order.CreatedAt)
+
+		if err != nil {
+			log.Printf("Error creating order: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create order"})
+			return
+		}
+
+		log.Printf("[WRITE] New Order Created: (ID: %d) for user: %d", order.ID, order.UserID)
+		c.JSON(http.StatusCreated, order)
 	})
 
 	log.Println("Order Service API starting on :8082")
@@ -186,6 +217,24 @@ func startMigrationWorker() {
 			} else {
 				log.Printf("Synced order: %d for user: %d", order.ID, order.UserID)
 			}
+		}
+	}
+}
+
+func syncIDSequence() {
+	var maxID sql.NullInt64
+	err := db.QueryRow("SELECT MAX(id) FROM orders").Scan(&maxID)
+	if err != nil {
+		log.Printf("Error getting max order ID: %v", err)
+		return
+	}
+
+	if maxID.Valid {
+		_, err = db.Exec("SELECT setval('orders_id_seq', $1)", maxID.Int64)
+		if err != nil {
+			log.Printf("Error setting order ID sequence: %v", err)
+		} else {
+			log.Printf("Synced orders_id_seq to %d", maxID.Int64)
 		}
 	}
 }
